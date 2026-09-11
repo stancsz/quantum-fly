@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Notebooks and local configuration
+.ipynb_checkpoints/
+.env
+.env.*
+
+# Research data and generated artifacts
+data/
+artifacts/
+outputs/
+checkpoints/
+*.parquet
+*.feather
+*.h5
+*.pt
+*.safetensors
+
+# Logs and local tooling
+logs/
+*.log
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.eggs/
+*.egg-info/
+.coverage
+htmlcov/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
