@@ -26,6 +26,17 @@ def test_message_correlation_and_durable_trace(tmp_path):
     assert payload["limitations"]
 
 
+def test_assessment_without_local_receipt_is_structured(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    result = FlyCoordinator(tmp_path / "trace.jsonl").handle("What is the current assessment?")
+    payload = result["payload"]
+    assert payload["state"] == "failed"
+    assert payload["observed"] == {"receipt_available": False, "as_of_time": None}
+    assert payload["missing_evidence"] == ["outputs/local-research-run.json"]
+    assert payload["limitations"]
+    assert "quickstart" in payload["proposed_next_action"]
+
+
 def test_allowlisted_research_preserves_evidence(tmp_path):
     result = FlyCoordinator(tmp_path / "trace.jsonl").handle("请研究官方 connectome source")
     assert result["type"] in {"task_result", "error"}

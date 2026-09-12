@@ -385,7 +385,19 @@ class FlyCoordinator:
             }
             refs = ["outputs/local-research-run.json"]
         else:
-            payload = {"state": "failed", "error": "persisted research trace missing"}
+            payload = {
+                "state": "failed",
+                "error": "persisted research trace missing",
+                "observed": {"receipt_available": False, "as_of_time": None},
+                "interpretation": "No local research result is available to assess yet.",
+                "hypothesis": "Running the bounded research path will create evidence that can be assessed.",
+                "missing_evidence": ["outputs/local-research-run.json"],
+                "limitations": [
+                    "no assessment is inferred when the local receipt is absent",
+                    "missing evidence is not treated as a negative or positive research result",
+                ],
+                "proposed_next_action": "Prepare the declared inputs and run python -m scripts.quickstart.",
+            }
             refs = []
         reply = self.envelope("task_result", "coordinator:local", "human:local", payload, request["message_id"], refs)
         self._trace(reply)

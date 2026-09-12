@@ -23,7 +23,7 @@ If that question interests you, fork the project, replace one component, run the
 
 ## Verified bounded run
 
-The current evidence snapshot records **46 local tests**, **4,096 selected MaleCNS segments**, and **160,053 retained sparse edges**. A preregistered historical comparison passed its bounded research gate, but that result is not forward performance or investment evidence. See the [criterion-level verification record](docs/VERIFICATION_2026-09-12.md) for commands, denominators, limitations, and separate GO/NO-GO decisions.
+The current evidence snapshot records **45+ local tests**, **4,096 selected MaleCNS segments**, and **160,053 retained sparse edges**. A preregistered historical comparison passed its bounded research gate, but that result is not forward performance or investment evidence. See the [criterion-level verification record](docs/VERIFICATION_2026-09-12.md) for commands, denominators, limitations, and separate GO/NO-GO decisions.
 
 ## See it in 30 seconds
 
