@@ -1,0 +1,5 @@
+# Clean-verification snapshot. Update deliberately after testing a fresh environment.
+numpy==2.5.3
+pyarrow==25.0.1
+pennylane==0.45.1
+pytest==9.1.1

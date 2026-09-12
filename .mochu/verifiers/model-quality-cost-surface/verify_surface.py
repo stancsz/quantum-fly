@@ -5,29 +5,31 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
-RECEIPT = ROOT / "outputs" / "model-quality-cost-eval.json"
 
 
 def main() -> int:
-    completed = subprocess.run(
-        [sys.executable, "-m", "scripts.run_model_quality_cost_eval", "--attempts", "3"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=180,
-    )
-    if completed.returncode != 0:
-        print(completed.stdout[-1500:], file=sys.stderr)
-        print(completed.stderr[-1500:], file=sys.stderr)
-        return completed.returncode or 1
-    receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))
-    attempts = receipt.get("attempts", [])
+    with tempfile.TemporaryDirectory(prefix="quantum-fly-model-surface-") as temp:
+        receipt = Path(temp) / "model-quality-cost-eval.json"
+        completed = subprocess.run(
+            [sys.executable, "-m", "scripts.run_model_quality_cost_eval", "--attempts", "3", "--output", str(receipt)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180,
+        )
+        if completed.returncode != 0:
+            print(completed.stdout[-1500:], file=sys.stderr)
+            print(completed.stderr[-1500:], file=sys.stderr)
+            return completed.returncode or 1
+        payload = json.loads(receipt.read_text(encoding="utf-8"))
+    attempts = payload.get("attempts", [])
     if len(attempts) != 3:
         print("expected exactly three attempts", file=sys.stderr)
         return 1
@@ -43,7 +45,7 @@ def main() -> int:
     if not all("usage" in item and "cost" in item["usage"] for item in attempts):
         print("usage/cost telemetry missing", file=sys.stderr)
         return 1
-    if not receipt.get("limitations") or "advantage" not in " ".join(receipt["limitations"]).lower():
+    if not payload.get("limitations") or "advantage" not in " ".join(payload["limitations"]).lower():
         print("measurement limitations missing", file=sys.stderr)
         return 1
     print("bounded model quality/cost measurement surface: OK")

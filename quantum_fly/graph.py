@@ -18,7 +18,7 @@ class SparseGraph:
     weight: np.ndarray
 
     def __post_init__(self) -> None:
-        if self.n_nodes < 1:
+        if isinstance(self.n_nodes, bool) or not isinstance(self.n_nodes, (int, np.integer)) or self.n_nodes < 1:
             raise ValueError("n_nodes must be positive")
         arrays = (self.pre, self.post, self.weight)
         if not (len(self.pre) == len(self.post) == len(self.weight)):
@@ -29,12 +29,16 @@ class SparseGraph:
             raise ValueError("edge index outside graph")
         if any(np.asarray(a).ndim != 1 for a in arrays):
             raise ValueError("edge arrays must be one-dimensional")
+        if not np.isfinite(np.asarray(self.weight, dtype=float)).all():
+            raise ValueError("edge weights must be finite")
 
     def step(self, state: np.ndarray, gain: float = 1.0) -> np.ndarray:
         """Apply one linear sparse message-passing step."""
         state = np.asarray(state, dtype=float)
         if state.shape != (self.n_nodes,):
             raise ValueError("state shape must equal (n_nodes,)")
+        if not np.isfinite(state).all() or not np.isfinite(gain):
+            raise ValueError("state and gain must be finite")
         result = np.zeros_like(state)
         np.add.at(result, self.post, gain * self.weight * state[self.pre])
         return np.tanh(result)
@@ -45,6 +49,8 @@ class SparseGraph:
         indices = np.asarray(indices, dtype=int)
         if state.shape != (self.n_nodes,):
             raise ValueError("state shape must equal (n_nodes,)")
+        if not np.isfinite(state).all():
+            raise ValueError("state must be finite")
         if np.any(indices < 0) or np.any(indices >= self.n_nodes):
             raise ValueError("readout index outside graph")
         return state[indices].copy()

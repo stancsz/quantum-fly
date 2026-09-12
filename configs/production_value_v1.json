@@ -1,0 +1,36 @@
+{
+  "schema": "quantum-fly-production-value-config.v1",
+  "protocol": "historical research lift gate v1",
+  "data_path": "data/market/sp500-2022-2025.csv",
+  "data_url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500&cosd=2022-01-01&coed=2025-12-31",
+  "candidate": "three_coordinator",
+  "baseline": "no_graph_mean",
+  "metric_view": "exposure_matching.test",
+  "train_size": 252,
+  "validation_size": 126,
+  "test_size": 126,
+  "step_size": 126,
+  "seeds": [0, 1, 2],
+  "base_cost": 0.001,
+  "cost_multipliers": [0.5, 1.0, 2.0],
+  "thresholds": {
+    "minimum_positive_folds": 3,
+    "minimum_positive_units": 8,
+    "minimum_units": 12,
+    "bootstrap_confidence": 0.95,
+    "bootstrap_lower_bound_gt": 0.0,
+    "max_drawdown_deterioration": 0.005,
+    "max_turnover_ratio": 1.2,
+    "minimum_candidate_activity_rate": 0.01,
+    "minimum_candidate_unique_position_count": 2,
+    "bootstrap_replicates": 2000,
+    "bootstrap_block_size": 2,
+    "bootstrap_seed": 20260912
+  },
+  "limitations": [
+    "The source is an S&P 500 index proxy, not a tradable execution feed.",
+    "This v1 receipt evaluates historical replay only.",
+    "Shadow operational and forward paper value gates are not implemented.",
+    "A research GO would not establish profitability, production readiness, quantum advantage, or cross-market generalization."
+  ]
+}

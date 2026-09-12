@@ -1,10 +1,11 @@
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
 import numpy as np
 
-from quantum_fly.agent import DurableTaskRuntime, FlyCoordinator, QueueFullError
+from quantum_fly.agent import MAX_PAYLOAD_BYTES, DurableTaskRuntime, FlyCoordinator, QueueFullError
 from quantum_fly.fixture import synthetic_graph
 from quantum_fly.loop import CommunicatingFlyLoop
 
@@ -100,6 +101,57 @@ def test_pending_runtime_cancel_is_persisted_and_not_executed(tmp_path):
     result = runtime.cancel(request["message_id"], coordinator.envelope)
     assert result["payload"]["state"] == "cancelled"
     assert runtime.run_next(lambda *_: {"unexpected": True}, coordinator.envelope) is None
+
+
+@pytest.mark.parametrize("max_seconds", [0, -1, 301, float("nan"), float("inf"), True, "slow"])
+def test_runtime_rejects_unbounded_or_nonfinite_task_budgets(tmp_path, max_seconds):
+    coordinator = FlyCoordinator(tmp_path / "trace.jsonl")
+    with pytest.raises(ValueError):
+        coordinator.envelope("research_request", "fly:a", "executor:allowlisted-http", {"budget": {"max_seconds": max_seconds}})
+
+
+def test_protocol_payload_and_queue_constructor_are_bounded(tmp_path):
+    coordinator = FlyCoordinator(tmp_path / "trace.jsonl")
+    with pytest.raises(ValueError):
+        coordinator.envelope("status", "a", "b", {"blob": "x" * MAX_PAYLOAD_BYTES})
+    with pytest.raises(ValueError):
+        DurableTaskRuntime(coordinator.trace_path, coordinator.append, max_queue_size=0)
+    with pytest.raises(ValueError):
+        DurableTaskRuntime(coordinator.trace_path, coordinator.append, max_queue_size=1025)
+
+
+def test_concurrent_runtime_workers_write_a_replayable_trace(tmp_path):
+    coordinator = FlyCoordinator(tmp_path / "trace.jsonl")
+    runtime = DurableTaskRuntime(coordinator.trace_path, coordinator.append, max_queue_size=4)
+    requests = [
+        coordinator.envelope("research_request", "fly:a", "executor:allowlisted-http", {"budget": {"max_seconds": 1}})
+        for _ in range(4)
+    ]
+    for request in requests:
+        runtime.enqueue(request)
+
+    def execute(request, _context):
+        time.sleep(0.01)
+        return {"task_id": request["message_id"]}
+
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        results = [future.result() for future in as_completed([workers.submit(runtime.run_next, execute, coordinator.envelope) for _ in requests])]
+    assert {result["payload"]["observed"]["task_id"] for result in results} == {request["message_id"] for request in requests}
+    assert runtime.replay_pending() == []
+    lines = [json.loads(line) for line in coordinator.trace_path.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == 12
+    assert all(isinstance(line["message_id"], str) for line in lines)
+
+
+def test_persisted_nonfinite_fly_state_is_rejected(tmp_path):
+    trace = tmp_path / "messages.jsonl"
+    state = tmp_path / "fly-state.json"
+    coordinator = FlyCoordinator(trace)
+    loop = CommunicatingFlyLoop(synthetic_graph(), state, coordinator)
+    loop.step(np.array([0.2, -0.4, 0.6, -0.1]))
+    state.write_text(state.read_text(encoding="utf-8").replace("0.0", "NaN", 1), encoding="utf-8")
+    with pytest.raises(ValueError, match="strict JSON"):
+        CommunicatingFlyLoop(synthetic_graph(), state, FlyCoordinator(trace))
 
 
 def test_communicating_loop_persists_independent_members_and_restarts(tmp_path):

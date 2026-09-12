@@ -20,6 +20,12 @@ from .backtest import Agent, risk_clamp
 from .graph import SparseGraph
 
 
+MAX_HISTORY = 1024
+MAX_STATE_BYTES = 16 * 1024 * 1024
+MAX_STEP_INDEX = 10**12
+MAX_MEMBER_NAME_CHARS = 64
+
+
 @dataclass(frozen=True)
 class MemberSpec:
     name: str
@@ -44,13 +50,19 @@ class CommunicatingFlyLoop:
         self.graph = graph
         self.state_path = state_path
         self.coordinator = coordinator
+        if isinstance(max_history, bool) or not isinstance(max_history, int) or not 1 <= max_history <= MAX_HISTORY:
+            raise ValueError(f"max_history must be an integer between 1 and {MAX_HISTORY}")
         self.max_history = max_history
         self.members = tuple(members)
         if not self.members:
             raise ValueError("at least one Fly member is required")
         if len(self.members) > 16:
             raise ValueError("member count exceeds bounded local runtime limit")
-        if any(m.feature_index < 0 for m in self.members):
+        if any(not isinstance(m.name, str) or not m.name or len(m.name) > MAX_MEMBER_NAME_CHARS for m in self.members):
+            raise ValueError("member names must be bounded non-empty strings")
+        if len({m.name for m in self.members}) != len(self.members):
+            raise ValueError("member names must be unique")
+        if any(isinstance(m.feature_index, bool) or not isinstance(m.feature_index, int) or m.feature_index < 0 for m in self.members):
             raise ValueError("feature_index must be non-negative")
         self.agents = {spec.name: Agent.create(graph, spec.feature_index) for spec in self.members}
         self.history: list[dict] = []
@@ -60,22 +72,43 @@ class CommunicatingFlyLoop:
     def _load(self) -> None:
         if not self.state_path.exists():
             return
-        data = json.loads(self.state_path.read_text(encoding="utf-8"))
+        if self.state_path.stat().st_size > MAX_STATE_BYTES:
+            raise ValueError(f"persisted Fly state exceeds {MAX_STATE_BYTES} bytes")
+        try:
+            data = json.loads(
+                self.state_path.read_text(encoding="utf-8"),
+                parse_constant=lambda token: (_ for _ in ()).throw(ValueError(f"non-finite JSON constant: {token}")),
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("persisted Fly state is not strict JSON") from exc
+        if not isinstance(data, dict):
+            raise ValueError("persisted Fly state must be an object")
         if data.get("version") != 1 or data.get("graph_nodes") != self.graph.n_nodes:
             raise ValueError("persisted Fly state is incompatible with this graph")
         saved = data.get("members", {})
         expected = {spec.name for spec in self.members}
-        if set(saved) != expected:
+        if not isinstance(saved, dict) or set(saved) != expected:
             raise ValueError("persisted Fly members do not match configured members")
         for spec in self.members:
             agent = self.agents[spec.name]
             record = saved[spec.name]
-            agent.state = np.asarray(record["state"], dtype=float)
-            agent.readout = np.asarray(record["readout"], dtype=float)
-            if agent.state.shape != (self.graph.n_nodes,) or agent.readout.shape != (4,):
+            if not isinstance(record, dict) or "state" not in record or "readout" not in record:
+                raise ValueError("persisted Fly member record is malformed")
+            try:
+                agent.state = np.asarray(record["state"], dtype=float)
+                agent.readout = np.asarray(record["readout"], dtype=float)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("persisted Fly member record is not numeric") from exc
+            if agent.state.shape != (self.graph.n_nodes,) or agent.readout.shape != (4,) or not np.isfinite(agent.state).all() or not np.isfinite(agent.readout).all():
                 raise ValueError("persisted Fly state has an invalid shape")
-        self.step_index = int(data.get("step_index", 0))
-        self.history = list(data.get("history", []))[-self.max_history :]
+        raw_step = data.get("step_index", 0)
+        if isinstance(raw_step, bool) or not isinstance(raw_step, int) or not 0 <= raw_step <= MAX_STEP_INDEX:
+            raise ValueError("persisted Fly step_index is outside its bound")
+        raw_history = data.get("history", [])
+        if not isinstance(raw_history, list) or len(raw_history) > MAX_HISTORY:
+            raise ValueError("persisted Fly history is outside its bound")
+        self.step_index = raw_step
+        self.history = raw_history[-self.max_history :]
 
     def _persist(self) -> None:
         data = {
@@ -94,7 +127,10 @@ class CommunicatingFlyLoop:
         }
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         temp = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
-        temp.write_text(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+        serialized = json.dumps(data, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        if len(serialized.encode("utf-8")) > MAX_STATE_BYTES:
+            raise ValueError(f"Fly state exceeds {MAX_STATE_BYTES} bytes")
+        temp.write_text(serialized + "\n", encoding="utf-8")
         temp.replace(self.state_path)
 
     def step(self, features: np.ndarray, as_of_time: str | None = None) -> dict:
@@ -104,6 +140,8 @@ class CommunicatingFlyLoop:
             raise ValueError("features must be a finite one-dimensional vector with at least 3 values")
         if any(spec.feature_index >= len(values) for spec in self.members):
             raise ValueError("member feature_index is outside the input vector")
+        if self.step_index >= MAX_STEP_INDEX:
+            raise ValueError("step_index reached its explicit bound")
 
         self.step_index += 1
         member_messages: list[dict] = []

@@ -7,6 +7,7 @@ shell, browser, or general agent-execution bridge.
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import json
+import math
 import os
 from pathlib import Path
 import threading
@@ -20,6 +21,73 @@ from .research import connectome_source_request
 
 
 DEFAULT_ROUTER_MODEL = os.environ.get("QUANTUM_FLY_ROUTER_MODEL", "minimax/minimax-m3")
+
+# These are deliberately small, explicit local-runtime limits.  They are
+# safety/operability bounds, not a claim about the capacity of a deployment.
+MIN_TASK_SECONDS = 0.001
+MAX_TASK_SECONDS = 300.0
+MIN_ROUTER_TIMEOUT_SECONDS = 0.01
+MAX_ROUTER_TIMEOUT_SECONDS = 60.0
+MAX_QUEUE_SIZE = 1024
+MAX_PAYLOAD_BYTES = 64 * 1024
+MAX_STATE_CHARS = 64
+MAX_MESSAGE_ID_CHARS = 128
+MAX_EVIDENCE_REFS = 16
+MAX_EVIDENCE_REF_CHARS = 256
+
+
+def _strict_json_bytes(value, *, label: str) -> bytes:
+    """Serialize a protocol value without allowing NaN/Infinity or huge data."""
+    try:
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{label} must be JSON-safe and finite") from exc
+    if len(encoded) > MAX_PAYLOAD_BYTES:
+        raise ValueError(f"{label} exceeds {MAX_PAYLOAD_BYTES} bytes")
+    return encoded
+
+
+def _strict_json_loads(text: str):
+    return json.loads(text, parse_constant=lambda token: (_ for _ in ()).throw(ValueError(f"non-finite JSON constant: {token}")))
+
+
+def _bounded_seconds(value, *, label: str, minimum: float, maximum: float) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a finite number")
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{label} must be a finite number") from exc
+    if not math.isfinite(result) or not minimum <= result <= maximum:
+        raise ValueError(f"{label} must be between {minimum} and {maximum} seconds")
+    return result
+
+
+def _validate_payload(payload: dict) -> None:
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be an object")
+    state = payload.get("state")
+    if state is not None and (not isinstance(state, str) or not state or len(state) > MAX_STATE_CHARS):
+        raise ValueError(f"state must be a non-empty string of at most {MAX_STATE_CHARS} characters")
+    budget = payload.get("budget")
+    if budget is not None:
+        if not isinstance(budget, dict):
+            raise ValueError("budget must be an object")
+        if "max_seconds" in budget:
+            _bounded_seconds(budget["max_seconds"], label="max_seconds", minimum=MIN_TASK_SECONDS, maximum=MAX_TASK_SECONDS)
+    _strict_json_bytes(payload, label="payload")
+
+
+def _validate_request(request: dict) -> None:
+    if not isinstance(request, dict) or request.get("type") != "research_request":
+        raise ValueError("runtime accepts only research_request envelopes")
+    if not isinstance(request.get("message_id"), str) or not request["message_id"] or len(request["message_id"]) > MAX_MESSAGE_ID_CHARS:
+        raise ValueError("message_id is missing or exceeds its bound")
+    _validate_payload(request.get("payload"))
+    budget = request["payload"].get("budget", {})
+    if not isinstance(budget, dict):
+        raise ValueError("budget must be an object")
+    _bounded_seconds(budget.get("max_seconds", 15), label="max_seconds", minimum=MIN_TASK_SECONDS, maximum=MAX_TASK_SECONDS)
 
 
 class QueueFullError(RuntimeError):
@@ -50,11 +118,15 @@ class DurableTaskRuntime:
     """
 
     def __init__(self, trace_path: Path, append, max_queue_size: int = 8):
+        if isinstance(max_queue_size, bool) or not isinstance(max_queue_size, int) or not 1 <= max_queue_size <= MAX_QUEUE_SIZE:
+            raise ValueError(f"max_queue_size must be an integer between 1 and {MAX_QUEUE_SIZE}")
         self.trace_path = trace_path
         self._append = append
         self.max_queue_size = max_queue_size
         self.tasks: dict[str, dict] = {}
         self.queue: list[str] = []
+        self._active: set[str] = set()
+        self._lock = threading.RLock()
         self._load()
 
     def _load(self) -> None:
@@ -62,86 +134,115 @@ class DurableTaskRuntime:
             return
         for line in self.trace_path.read_text(encoding="utf-8").splitlines():
             try:
-                message = json.loads(line)
+                message = _strict_json_loads(line)
                 task_id = message.get("correlation_id")
                 state = message.get("payload", {}).get("state")
                 if message.get("type") == "research_request":
-                    self.tasks[message["message_id"]] = {"request": message, "state": "accepted"}
-                    self.queue.append(message["message_id"])
+                    _validate_request(message)
+                    task_id = message["message_id"]
+                    if task_id in self.tasks:
+                        continue
+                    if len(self.queue) >= self.max_queue_size:
+                        raise QueueFullError("persisted runtime queue exceeds configured bound")
+                    self.tasks[task_id] = {"request": message, "state": "accepted"}
+                    self.queue.append(task_id)
                 elif task_id in self.tasks and state in {"running", "result", "failed", "cancelled", "timed_out"}:
                     self.tasks[task_id]["state"] = state
                     if state in {"result", "failed", "cancelled", "timed_out"} and task_id in self.queue:
                         self.queue.remove(task_id)
-            except (ValueError, KeyError, TypeError):
+            except (ValueError, KeyError, TypeError, AttributeError):
                 continue
 
     def enqueue(self, request: dict) -> dict:
+        _validate_request(request)
         task_id = request["message_id"]
-        if task_id in self.tasks:
-            return {"type": "ack", "duplicate": True, "message_id": task_id}
-        if len(self.queue) >= self.max_queue_size:
-            raise QueueFullError(f"bounded queue full (max={self.max_queue_size})")
-        self.tasks[task_id] = {"request": request, "state": "accepted"}
-        self.queue.append(task_id)
+        with self._lock:
+            if task_id in self.tasks:
+                return {"type": "ack", "duplicate": True, "message_id": task_id}
+            if len(self.queue) >= self.max_queue_size:
+                raise QueueFullError(f"bounded queue full (max={self.max_queue_size})")
+            self.tasks[task_id] = {"request": request, "state": "accepted"}
+            self.queue.append(task_id)
         self._append(request)
         return request
 
     def cancel(self, task_id: str, envelope) -> dict:
-        task = self.tasks.get(task_id)
-        if task is None:
-            return envelope("error", "coordinator:local", "human:local", {"state": "failed", "error": "unknown task"}, task_id)
-        task["cancel_event"].set() if "cancel_event" in task else None
-        task["state"] = "cancelled"
-        if task_id in self.queue:
-            self.queue.remove(task_id)
+        with self._lock:
+            task = self.tasks.get(task_id)
+            if task is None:
+                return envelope("error", "coordinator:local", "human:local", {"state": "failed", "error": "unknown task"}, task_id)
+            task["cancel_event"].set() if "cancel_event" in task else None
+            task["state"] = "cancelled"
+            if task_id in self.queue:
+                self.queue.remove(task_id)
         result = envelope("task_result", "coordinator:local", "human:local", {"state": "cancelled", "correlation_id": task_id}, task_id)
         self._append(result)
         return result
 
     def replay_pending(self) -> list[str]:
         """Return accepted requests restored from the durable trace in FIFO order."""
-        return list(self.queue)
+        with self._lock:
+            return list(self.queue)
 
     def run_next(self, executor, envelope) -> dict | None:
-        while self.queue:
-            task_id = self.queue.pop(0)
-            task = self.tasks[task_id]
-            if task["state"] == "cancelled":
-                continue
-            request = task["request"]
-            max_seconds = float(request.get("payload", {}).get("budget", {}).get("max_seconds", 15))
-            cancel_event = threading.Event()
-            task["cancel_event"] = cancel_event
-            task["state"] = "running"
-            self._append(envelope("status", "coordinator:local", "human:local", {"state": "running"}, task_id))
-            context = TaskContext(cancel_event, time.monotonic() + max_seconds)
-            pool = ThreadPoolExecutor(max_workers=1)
-            future = pool.submit(executor, request, context)
+        with self._lock:
+            while self.queue:
+                task_id = self.queue.pop(0)
+                task = self.tasks[task_id]
+                if task["state"] == "cancelled" or task_id in self._active:
+                    continue
+                self._active.add(task_id)
+                request = task["request"]
+                max_seconds = _bounded_seconds(
+                    request.get("payload", {}).get("budget", {}).get("max_seconds", 15),
+                    label="max_seconds", minimum=MIN_TASK_SECONDS, maximum=MAX_TASK_SECONDS,
+                )
+                cancel_event = threading.Event()
+                task["cancel_event"] = cancel_event
+                task["state"] = "running"
+                break
+            else:
+                return None
+
+        self._append(envelope("status", "coordinator:local", "human:local", {"state": "running"}, task_id))
+        context = TaskContext(cancel_event, time.monotonic() + max_seconds)
+        pool = ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(executor, request, context)
+        try:
             try:
                 observed = future.result(timeout=max_seconds)
                 context.raise_if_stopped()
             except FutureTimeout:
                 cancel_event.set()
-                task["state"] = "timed_out"
-                result = envelope("error", "executor:allowlisted-http", "human:local", {"state": "timed_out", "error": "executor exceeded max_seconds"}, task_id)
+                state = "timed_out"
+                result = envelope("error", "executor:allowlisted-http", "human:local", {"state": state, "error": "executor exceeded max_seconds"}, task_id)
             except Exception as exc:
-                state = "cancelled" if cancel_event.is_set() or str(exc) == "cancelled" else "failed"
-                task["state"] = state
+                state = "timed_out" if isinstance(exc, TimeoutError) else ("cancelled" if cancel_event.is_set() or str(exc) == "cancelled" else "failed")
                 result = envelope("error", "executor:allowlisted-http", "human:local", {"state": state, "error": str(exc)[:240]}, task_id)
             else:
-                task["state"] = "result"
-                result = envelope("task_result", "executor:allowlisted-http", "human:local", {"state": "result", "observed": observed}, task_id, [observed["url"]] if isinstance(observed, dict) and "url" in observed else [])
-            pool.shutdown(wait=False, cancel_futures=True)
+                with self._lock:
+                    cancelled = cancel_event.is_set() or task["state"] == "cancelled"
+                    state = "cancelled" if cancelled else "result"
+                if state == "cancelled":
+                    result = envelope("task_result", "coordinator:local", "human:local", {"state": state, "correlation_id": task_id}, task_id)
+                else:
+                    result = envelope("task_result", "executor:allowlisted-http", "human:local", {"state": state, "observed": observed}, task_id, [observed["url"]] if isinstance(observed, dict) and "url" in observed else [])
+            with self._lock:
+                task["state"] = state
             self._append(result)
             return result
-        return None
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+            with self._lock:
+                self._active.discard(task_id)
 
     def run_task(self, task_id: str, executor, envelope) -> dict | None:
         """Run a specific accepted task while preserving other replayable work."""
-        if task_id not in self.tasks or task_id not in self.queue:
-            return None
-        self.queue.remove(task_id)
-        self.queue.insert(0, task_id)
+        with self._lock:
+            if task_id not in self.tasks or task_id not in self.queue or task_id in self._active:
+                return None
+            self.queue.remove(task_id)
+            self.queue.insert(0, task_id)
         return self.run_next(executor, envelope)
 
 
@@ -151,15 +252,32 @@ class FlyCoordinator:
         self.trace_path.parent.mkdir(parents=True, exist_ok=True)
         self.router_url = router_url
         self.seen: set[str] = set()
+        self._append_lock = threading.RLock()
         if self.trace_path.exists():
             for line in self.trace_path.read_text(encoding="utf-8").splitlines():
                 try:
-                    self.seen.add(json.loads(line)["message_id"])
-                except (ValueError, KeyError):
+                    message = _strict_json_loads(line)
+                    if isinstance(message, dict) and isinstance(message.get("message_id"), str):
+                        self.seen.add(message["message_id"])
+                except (ValueError, KeyError, TypeError):
                     continue
         self.runtime = DurableTaskRuntime(self.trace_path, self.append)
 
     def envelope(self, kind: str, sender: str, recipient: str, payload: dict, correlation_id: str | None = None, evidence_refs: list[str] | None = None) -> dict:
+        if not all(isinstance(value, str) and value and len(value) <= MAX_STATE_CHARS for value in (kind, sender, recipient)):
+            raise ValueError("kind, sender, and recipient must be bounded non-empty strings")
+        _validate_payload(payload)
+        if correlation_id is not None and (not isinstance(correlation_id, str) or len(correlation_id) > MAX_MESSAGE_ID_CHARS):
+            raise ValueError("correlation_id exceeds its bound")
+        refs = evidence_refs or []
+        if not isinstance(refs, list) or len(refs) > MAX_EVIDENCE_REFS or any(
+            not isinstance(ref, str) or not ref or len(ref) > MAX_EVIDENCE_REF_CHARS for ref in refs
+        ):
+            raise ValueError("evidence_refs exceed their explicit bounds")
+        observed = payload.get("observed")
+        as_of_time = payload.get("as_of_time")
+        if as_of_time is None and isinstance(observed, dict):
+            as_of_time = observed.get("as_of_time")
         return {
             "protocol_version": "fly/0.1",
             "type": kind,
@@ -168,24 +286,34 @@ class FlyCoordinator:
             "sender": sender,
             "recipient": recipient,
             "event_time": datetime.now(timezone.utc).isoformat(),
-            "as_of_time": payload.get("as_of_time") or payload.get("observed", {}).get("as_of_time"),
+            "as_of_time": as_of_time,
             "payload": payload,
-            "evidence_refs": evidence_refs or [],
+            "evidence_refs": refs,
         }
 
     def append(self, message: dict) -> dict:
-        if message["message_id"] in self.seen:
-            return {"type": "ack", "duplicate": True, "message_id": message["message_id"]}
-        self.seen.add(message["message_id"])
-        with self.trace_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(message, ensure_ascii=False) + "\n")
+        if not isinstance(message, dict) or not isinstance(message.get("message_id"), str) or not message["message_id"] or len(message["message_id"]) > MAX_MESSAGE_ID_CHARS:
+            raise ValueError("message_id is missing or exceeds its bound")
+        _validate_payload(message.get("payload"))
+        _strict_json_bytes(message, label="message")
+        with self._append_lock:
+            if message["message_id"] in self.seen:
+                return {"type": "ack", "duplicate": True, "message_id": message["message_id"]}
+            self.seen.add(message["message_id"])
+            with self.trace_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(message, ensure_ascii=False, allow_nan=False) + "\n")
         return message
 
     def _trace(self, message: dict) -> None:
         self.append(message)
 
     def router_advice(self, prompt: str, timeout: float = 8.0, model: str | None = None) -> dict:
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_PAYLOAD_BYTES:
+            raise ValueError("prompt must be a non-empty bounded string")
+        timeout = _bounded_seconds(timeout, label="timeout", minimum=MIN_ROUTER_TIMEOUT_SECONDS, maximum=MAX_ROUTER_TIMEOUT_SECONDS)
         selected_model = model or DEFAULT_ROUTER_MODEL
+        if not isinstance(selected_model, str) or not selected_model or len(selected_model) > MAX_STATE_CHARS:
+            raise ValueError("model must be a bounded non-empty string")
         request_id = f"req-{uuid.uuid4().hex}"
         request_body = {"model": selected_model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 200, "temperature": 0}
         body = json.dumps(request_body).encode()

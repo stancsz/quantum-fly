@@ -44,12 +44,33 @@ def risk_clamp(value: float, limit: float = 0.5) -> float:
     return float(np.clip(value, -limit, limit))
 
 
+def position_turnover(position: float, previous_position: float) -> float:
+    """Return the absolute target-position change charged at a rebalance."""
+    return float(abs(float(position) - float(previous_position)))
+
+
+def position_pnl(
+    position: float,
+    next_return: float,
+    previous_position: float,
+    costs: float,
+) -> tuple[float, float, float]:
+    """Return net PnL, turnover, and transaction cost for one target position."""
+    turnover = position_turnover(position, previous_position)
+    transaction_cost = float(costs) * turnover
+    pnl = float(position) * float(next_return) - transaction_cost
+    return pnl, turnover, transaction_cost
+
+
 def run_backtest(selection: ConnectomeSelection, closes: np.ndarray, costs: float = 0.001) -> dict:
     train_end = int(len(closes) * 0.6)
     validation_end = int(len(closes) * 0.8)
     agents = [Agent.create(selection.graph, i) for i in range(3)]
     no_learning = [Agent.create(selection.graph, i) for i in range(3)]
     records: list[dict] = []
+    previous_positions = {"classical": 0.0, "queen": 0.0, "nolearn": 0.0}
+    previous_agent_positions = np.zeros(3, dtype=float)
+    previous_nolearn_positions = np.zeros(3, dtype=float)
     for t in range(20, len(closes) - 1):
         features = causal_features(closes, t)
         signals = np.array([risk_clamp(a.decide(features)) for a in agents])
@@ -60,25 +81,52 @@ def run_backtest(selection: ConnectomeSelection, closes: np.ndarray, costs: floa
         next_return = float(closes[t + 1] / closes[t] - 1.0)
         # Credit is computed only after t+1 is observed. It is never used to
         # update an agent once the training cutoff has passed.
-        reward = next_return * signals - costs * np.abs(signals)
+        rewards = []
+        agent_turnover = []
+        agent_costs = []
+        for signal, previous in zip(signals, previous_agent_positions):
+            pnl, turnover, transaction_cost = position_pnl(signal, next_return, previous, costs)
+            rewards.append(pnl)
+            agent_turnover.append(turnover)
+            agent_costs.append(transaction_cost)
+        reward = np.asarray(rewards, dtype=float)
         if t < train_end:
             for agent, reward_i, signal_i in zip(agents, reward, signals):
                 agent.update(float(reward_i), float(signal_i))
-        records.append({"t": t, "features": features.tolist(), "signals": signals.tolist(), "classical": classical, "queen": queen, "nolearn": float(nolearn.mean()), "next_return": next_return, "rewards": reward.tolist(), "engineering_credit": reward.tolist(), "credit_observed_at": t + 1, "readout_updated": bool(t < train_end)})
+        strategy_positions = {"classical": classical, "queen": queen, "nolearn": float(nolearn.mean())}
+        strategy_pnl = {}
+        strategy_turnover = {}
+        strategy_costs = {}
+        for name, position in strategy_positions.items():
+            pnl, turnover, transaction_cost = position_pnl(
+                position, next_return, previous_positions[name], costs
+            )
+            strategy_pnl[name] = pnl
+            strategy_turnover[name] = turnover
+            strategy_costs[name] = transaction_cost
+        records.append({"t": t, "features": features.tolist(), "signals": signals.tolist(), "positions": strategy_positions, "classical": classical, "queen": queen, "nolearn": float(nolearn.mean()), "next_return": next_return, "rewards": reward.tolist(), "engineering_credit": reward.tolist(), "agent_turnover": agent_turnover, "agent_transaction_cost": agent_costs, "pnl": strategy_pnl, "turnover": strategy_turnover, "transaction_cost": strategy_costs, "credit_observed_at": t + 1, "readout_updated": bool(t < train_end)})
+        previous_positions.update(strategy_positions)
+        previous_agent_positions = signals.copy()
+        previous_nolearn_positions = nolearn.copy()
 
     def metric(key: str, start: int, end: int) -> dict:
         part = records[start:end]
         values = np.array([x[key] for x in part], dtype=float)
         returns = np.array([x["next_return"] for x in part], dtype=float)
-        pnl = values * returns - costs * np.abs(values)
-        return {"n": len(part), "mean_pnl": float(pnl.mean()), "cumulative_pnl": float(pnl.sum()), "mean_abs_signal": float(np.abs(values).mean())}
+        previous = float(records[start - 1][key]) if start else 0.0
+        turnovers = np.asarray([position_turnover(value, previous if i == 0 else values[i - 1]) for i, value in enumerate(values)], dtype=float)
+        pnl = values * returns - costs * turnovers
+        cumulative = np.cumsum(pnl) if len(pnl) else np.zeros(0)
+        drawdown = cumulative - np.maximum.accumulate(cumulative) if len(cumulative) else np.zeros(0)
+        return {"n": len(part), "mean_pnl": float(pnl.mean()), "cumulative_pnl": float(pnl.sum()), "mean_abs_signal": float(np.abs(values).mean()), "mean_turnover": float(turnovers.mean()), "total_turnover": float(turnovers.sum()), "max_drawdown": float(drawdown.min()) if len(drawdown) else 0.0}
 
     test_start = validation_end - 20
     return {
         "split": {"train_end_close_index": train_end, "validation_end_close_index": validation_end, "test_record_start": test_start},
         "costs": costs,
         "learning": {
-            "credit_rule": "next_return * signal - costs * abs(signal)",
+            "credit_rule": "next_return * position - costs * abs(position - previous_position)",
+            "position_semantics": "signal is the target position; initial previous_position is zero and each later cost uses the actual prior target position",
             "credit_observation_lag": 1,
             "readout_updates_before_close_index": train_end,
             "validation_and_test_readout_frozen": True,
@@ -130,16 +178,21 @@ def compare_agent_structures(
         values = np.asarray([record["signal"] for record in part], dtype=float) * signal_scale
         values = np.clip(values, -0.5, 0.5)
         returns = np.asarray([record["next_return"] for record in part], dtype=float)
-        pnl = values * returns - costs * np.abs(values)
+        previous_record = next((record for record in reversed(records) if record["t"] == start - 1), None)
+        previous = float(previous_record["signal"]) * signal_scale if previous_record else 0.0
+        turnovers = np.asarray([position_turnover(value, previous if i == 0 else values[i - 1]) for i, value in enumerate(values)], dtype=float)
+        pnl = values * returns - costs * turnovers
         cumulative = np.cumsum(pnl) if len(pnl) else np.zeros(0)
         drawdown = cumulative - np.maximum.accumulate(cumulative) if len(cumulative) else np.zeros(0)
-        previous = np.concatenate(([0.0], values[:-1])) if len(values) else np.zeros(0)
         return {
             "n": int(len(part)),
             "mean_pnl": float(pnl.mean()) if len(pnl) else 0.0,
             "cumulative_pnl": float(pnl.sum()) if len(pnl) else 0.0,
             "mean_abs_signal": float(np.abs(values).mean()) if len(values) else 0.0,
-            "mean_turnover": float(np.abs(values - previous).mean()) if len(values) else 0.0,
+            "mean_turnover": float(turnovers.mean()) if len(values) else 0.0,
+            "total_turnover": float(turnovers.sum()) if len(values) else 0.0,
+            "activity_rate": float(np.mean(turnovers > 1e-6)) if len(values) else 0.0,
+            "unique_position_count": int(len(np.unique(np.round(values, decimals=12)))) if len(values) else 0,
             "max_drawdown": float(drawdown.min()) if len(drawdown) else 0.0,
         }
 
@@ -151,6 +204,9 @@ def compare_agent_structures(
         coordinator_state = np.zeros(selection.graph.n_nodes, dtype=float)
         records = {name: [] for name in structures}
         member_history: list[list[float]] = []
+        previous_member_positions = np.zeros(3, dtype=float)
+        previous_single_position = 0.0
+        previous_no_graph_positions = np.zeros(3, dtype=float)
         for t in range(20, len(closes) - 1):
             features = causal_features(closes, t)
             single_signal = risk_clamp(single.decide(features))
@@ -172,11 +228,17 @@ def compare_agent_structures(
                 records[name].append({"t": t, "signal": signal, "next_return": next_return})
             member_history.append(member_signals.tolist())
             if t < train_end:
-                for agent, signal in zip(members, member_signals):
-                    agent.update(next_return * signal - costs * abs(signal), float(signal))
-                single.update(next_return * single_signal - costs * abs(single_signal), single_signal)
-                for agent, signal in zip(no_graph, no_graph_signals):
-                    agent.update(next_return * signal - costs * abs(signal), float(signal))
+                for index, (agent, signal) in enumerate(zip(members, member_signals)):
+                    reward, _, _ = position_pnl(signal, next_return, previous_member_positions[index], costs)
+                    agent.update(reward, float(signal))
+                single_reward, _, _ = position_pnl(single_signal, next_return, previous_single_position, costs)
+                single.update(single_reward, single_signal)
+                for index, (agent, signal) in enumerate(zip(no_graph, no_graph_signals)):
+                    reward, _, _ = position_pnl(signal, next_return, previous_no_graph_positions[index], costs)
+                    agent.update(reward, float(signal))
+            previous_member_positions = member_signals.copy()
+            previous_single_position = float(single_signal)
+            previous_no_graph_positions = no_graph_signals.copy()
 
         member_matrix = np.asarray(member_history, dtype=float)
         if member_matrix.shape[0] > 1 and member_matrix.shape[1] > 1:

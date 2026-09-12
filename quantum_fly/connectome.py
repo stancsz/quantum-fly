@@ -11,6 +11,31 @@ import pyarrow.feather as feather
 from .graph import SparseGraph
 
 
+MAX_CONNECTOME_NODES = 100_000
+MAX_SOURCE_EDGES = 50_000_000
+
+
+def _bounded_int(value, *, label: str, minimum: int, maximum: int) -> int:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or not minimum <= int(value) <= maximum:
+        raise ValueError(f"{label} must be an integer between {minimum} and {maximum}")
+    return int(value)
+
+
+def _coerce_edge_ids(values, *, label: str, allow_negative: bool = False) -> np.ndarray:
+    raw = np.asarray(values)
+    try:
+        finite = np.isfinite(raw).all()
+        integral = np.equal(raw, np.rint(raw)).all()
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must contain numeric IDs") from exc
+    if not finite or not integral:
+        raise ValueError(f"{label} contains non-finite or non-integral IDs")
+    lower_bound = np.iinfo(np.int64).min if allow_negative else 0
+    if np.any(raw < lower_bound) or np.any(raw > np.iinfo(np.int64).max):
+        raise ValueError(f"{label} contains out-of-range IDs")
+    return raw.astype(np.int64, copy=False)
+
+
 def _process_working_set_bytes() -> int | None:
     """Read the current Windows process working set without a dependency."""
     if not hasattr(ctypes, "windll"):
@@ -77,14 +102,32 @@ def load_bounded_connectome(
     The current run selects the lowest sorted annotated body IDs. This is a
     segment-level research fixture, not a whole-brain neuron graph.
     """
-    if max_nodes < 2 or max_source_edges < 1:
-        raise ValueError("max_nodes must be at least 2 and max_source_edges positive")
-    annotation_path = next(raw_dir.glob("body-annotations*.feather"))
-    weight_path = next(raw_dir.glob("connectome-weights*.feather"))
-    nt_path = next(raw_dir.glob("body-neurotransmitters*.feather"))
+    max_nodes = _bounded_int(max_nodes, label="max_nodes", minimum=2, maximum=MAX_CONNECTOME_NODES)
+    max_source_edges = _bounded_int(max_source_edges, label="max_source_edges", minimum=1, maximum=MAX_SOURCE_EDGES)
+    raw_dir = Path(raw_dir)
+    if not raw_dir.is_dir():
+        raise ValueError("raw_dir must be an existing directory")
+    try:
+        annotation_path = next(raw_dir.glob("body-annotations*.feather"))
+        weight_path = next(raw_dir.glob("connectome-weights*.feather"))
+        nt_path = next(raw_dir.glob("body-neurotransmitters*.feather"))
+    except StopIteration as exc:
+        raise ValueError("raw_dir is missing one or more required Feather tables") from exc
 
     annotations = feather.read_table(annotation_path, columns=["bodyId"])
     all_ids = np.unique(annotations["bodyId"].to_numpy(zero_copy_only=False))
+    try:
+        finite_ids = np.isfinite(all_ids).all()
+        integral_ids = np.equal(all_ids, np.rint(all_ids)).all()
+    except (TypeError, ValueError) as exc:
+        raise ValueError("body annotations must contain numeric body IDs") from exc
+    if all_ids.ndim != 1 or not len(all_ids) or not finite_ids:
+        raise ValueError("body annotations contain non-finite or empty body IDs")
+    if not integral_ids:
+        raise ValueError("body annotations contain non-integral body IDs")
+    if np.any(all_ids < 0) or np.any(all_ids > np.iinfo(np.int64).max):
+        raise ValueError("body annotations contain out-of-range body IDs")
+    all_ids = all_ids.astype(np.int64, copy=False)
     body_ids = np.sort(all_ids)[:max_nodes]
     nt = feather.read_table(nt_path, columns=["body", "consensus_nt"])
     nt_signs = np.zeros(len(body_ids), dtype=np.float32)
@@ -103,19 +146,22 @@ def load_bounded_connectome(
     )
     for batch in scanner.to_batches():
         data = batch.to_pydict()
-        pre = np.asarray(data["body_pre"], dtype=np.int64)
-        post = np.asarray(data["body_post"], dtype=np.int64)
+        pre = _coerce_edge_ids(data["body_pre"], label="body_pre")
+        post = _coerce_edge_ids(data["body_post"], label="body_post")
+        raw_weights = np.asarray(data["weight"], dtype=np.float32)
+        if not np.isfinite(raw_weights).all():
+            raise ValueError("connectome weights contain non-finite values")
         remaining = max_source_edges - source_edges
         if len(pre) > remaining:
             pre = pre[:remaining]
             post = post[:remaining]
-            data["weight"] = data["weight"][:remaining]
+            raw_weights = raw_weights[:remaining]
         keep = np.isin(pre, body_ids) & np.isin(post, body_ids)
         source_edges += len(pre)
         if keep.any():
             pre_parts.append(np.searchsorted(body_ids, pre[keep]).astype(np.int32))
             post_parts.append(np.searchsorted(body_ids, post[keep]).astype(np.int32))
-            raw_weight = np.asarray(data["weight"], dtype=np.float32)[keep]
+            raw_weight = raw_weights[keep]
             signs = nt_signs[pre_parts[-1]]
             post_parts[-1] = post_parts[-1]
             # Unknown transmitter mapping keeps the published positive contact
@@ -151,7 +197,13 @@ def scan_full_connectome(raw_dir: Path) -> dict:
     so it is evidence about source integrity and scan feasibility, not a claim
     that a full executable graph fits the local memory budget.
     """
-    weight_path = next(raw_dir.glob("connectome-weights*.feather"))
+    raw_dir = Path(raw_dir)
+    if not raw_dir.is_dir():
+        raise ValueError("raw_dir must be an existing directory")
+    try:
+        weight_path = next(raw_dir.glob("connectome-weights*.feather"))
+    except StopIteration as exc:
+        raise ValueError("raw_dir is missing the connectome weights Feather table") from exc
     started = time.perf_counter()
     import tracemalloc
 
@@ -171,11 +223,13 @@ def scan_full_connectome(raw_dir: Path) -> dict:
             # Convert one bounded batch at a time. ``to_pydict`` would create
             # a large Python object graph for every batch and obscure the
             # memory boundary we are measuring.
-            pre = batch.column(0).to_numpy(zero_copy_only=False).astype(np.int64, copy=False)
-            post = batch.column(1).to_numpy(zero_copy_only=False).astype(np.int64, copy=False)
-            weight = batch.column(2).to_numpy(zero_copy_only=False).astype(np.int64, copy=False)
+            pre = _coerce_edge_ids(batch.column(0).to_numpy(zero_copy_only=False), label="body_pre", allow_negative=True)
+            post = _coerce_edge_ids(batch.column(1).to_numpy(zero_copy_only=False), label="body_post", allow_negative=True)
+            weight = batch.column(2).to_numpy(zero_copy_only=False).astype(np.float64, copy=False)
             rows += len(pre)
             invalid_endpoint_rows += int(np.count_nonzero((pre < 0) | (post < 0)))
+            if not np.isfinite(weight).all():
+                raise ValueError("connectome weights contain non-finite values")
             if len(pre):
                 batch_min = int(min(pre.min(), post.min()))
                 batch_max = int(max(pre.max(), post.max()))

@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import os
 import time
 import tracemalloc
 import numpy as np
@@ -21,7 +22,7 @@ def main() -> None:
     started = time.perf_counter()
     tracemalloc.start()
     raw = ROOT / "data" / "malecns-v1.0" / "raw"
-    market_cache = ROOT / "data" / "market" / "sp500-2024.csv"
+    market_cache = Path(os.environ.get("QUANTUM_FLY_MARKET_CACHE", ROOT / "data" / "market" / "sp500-2024.csv"))
     market_features, market_provenance = load_or_download(market_cache)
     closes, history_provenance = load_history(market_cache)
     selection = load_bounded_connectome(raw, max_nodes=4096, max_source_edges=10_000_000)
@@ -117,7 +118,7 @@ def main() -> None:
     }
     if quantum is None:
         result["limitations"].append("PennyLane analytic/held-out outputs are unavailable when the optional quantum extra is not installed")
-    out = ROOT / "outputs" / "local-research-run.json"
+    out = Path(os.environ.get("QUANTUM_FLY_LOCAL_RECEIPT", ROOT / "outputs" / "local-research-run.json"))
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result, indent=2))

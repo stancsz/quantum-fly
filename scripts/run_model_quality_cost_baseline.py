@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import json
 import math
+import os
 import time
 import urllib.error
 import urllib.request
@@ -109,7 +110,8 @@ def main() -> int:
             "approximate intervals are descriptive and do not replace preregistration or independent evaluation",
         ],
     }
-    output = Path("outputs/model-quality-cost-baseline.json")
+    output = Path(os.environ.get("QUANTUM_FLY_MODEL_BASELINE_RECEIPT", "outputs/model-quality-cost-baseline.json"))
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps({"status": result["comparison"]["status"], "candidate": candidate, "baseline": baseline, "wall_seconds": result["wall_seconds"]}, indent=2))
     return 0

@@ -24,7 +24,7 @@
 
 The official page describes the weights as the full segment-to-segment connection graph, excluding segments with no synapses, with the published `minconf-0.5` threshold. These are anatomy-derived contact-count weights, not trained model weights, quantum weights or trading weights. Do not equate the weight-row count with the annotation-row count or neuron count.
 
-The downloaded source is licensed CC-BY according to the official page. Keep that data attribution separate from this repository's software license, which is still not selected. The official page also lists body-stats, synapse points, synaptic partners and per-synapse neurotransmitter tables; they were intentionally not downloaded because they are not needed for this current scope.
+The downloaded source is licensed CC-BY according to the official page. Keep that data attribution separate from this repository's MIT software license. The official page also lists body-stats, synapse points, synaptic partners and per-synapse neurotransmitter tables; they were intentionally not downloaded because they are not needed for this current scope.
 
 The first local runnable integration uses a deterministic bounded selection of 4,096 sorted annotated segment IDs and scans the first 10,000,000 rows of the official weight table. This is an execution boundary for the smoke test, not a claim about the full graph. The complete downloaded file remains available for a later profiled pass.
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -27,20 +28,21 @@ def main() -> int:
     if missing:
         print(f"boundary document missing claims: {missing}", file=sys.stderr)
         return 1
-    trace = ROOT / ".mochu" / "wip" / "boundary-verifier-trace.jsonl"
-    result = subprocess.run(
-        [sys.executable, "-m", "scripts.fly_chat", "当前评估是什么，缺少什么证据？", "--trace", str(trace)],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
-    )
-    if result.returncode != 0 or "limitations" not in result.stdout.lower():
-        print(result.stdout[-1500:], file=sys.stderr)
-        print(result.stderr[-1500:], file=sys.stderr)
-        return result.returncode or 1
+    with tempfile.TemporaryDirectory(prefix="quantum-fly-boundary-") as temp:
+        trace = Path(temp) / "boundary-verifier-trace.jsonl"
+        result = subprocess.run(
+            [sys.executable, "-m", "scripts.fly_chat", "当前评估是什么，缺少什么证据？", "--trace", str(trace)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+        if result.returncode != 0 or "limitations" not in result.stdout.lower():
+            print(result.stdout[-1500:], file=sys.stderr)
+            print(result.stderr[-1500:], file=sys.stderr)
+            return result.returncode or 1
     print("research boundary and structured assessment path: OK")
     return 0
 

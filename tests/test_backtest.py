@@ -1,6 +1,6 @@
 import numpy as np
 
-from quantum_fly.backtest import Agent, compare_agent_structures, risk_clamp, run_backtest, run_walk_forward_comparison
+from quantum_fly.backtest import Agent, compare_agent_structures, position_pnl, position_turnover, risk_clamp, run_backtest, run_walk_forward_comparison
 from quantum_fly.fixture import synthetic_graph
 from quantum_fly.market import causal_features
 from quantum_fly.connectome import ConnectomeSelection
@@ -20,6 +20,31 @@ def test_agent_states_are_independent_and_risk_is_clamped():
     a.decide(np.array([1.0, 0.0, 0.0, 0.0]))
     assert not np.array_equal(a.state, b.state)
     assert risk_clamp(10.0) == 0.5
+
+
+def test_transaction_cost_is_position_turnover_with_explicit_transition_semantics():
+    assert position_turnover(0.25, 0.0) == 0.25
+    assert position_turnover(0.25, 0.25) == 0.0
+    assert position_turnover(-0.25, 0.25) == 0.5
+    assert position_turnover(0.0, -0.25) == 0.25
+    pnl, turnover, transaction_cost = position_pnl(0.25, 0.04, 0.0, 0.01)
+    assert np.isclose(turnover, 0.25)
+    assert np.isclose(transaction_cost, 0.0025)
+    assert np.isclose(pnl, 0.0075)
+
+
+def test_backtest_records_cost_hold_and_exit_turnover_consistently():
+    graph = synthetic_graph()
+    selection = ConnectomeSelection(graph, np.arange(4), np.zeros(4), 4, 4, 5, 5, "fixture")
+    result = run_backtest(selection, np.linspace(100, 120, 80), costs=0.001)
+    records = result["records"]
+    assert np.isclose(records[0]["turnover"]["classical"], abs(records[0]["classical"]))
+    assert np.isclose(records[0]["transaction_cost"]["classical"], 0.001 * abs(records[0]["classical"]))
+    for index in range(1, len(records)):
+        previous = records[index - 1]["classical"]
+        current = records[index]["classical"]
+        assert np.isclose(records[index]["turnover"]["classical"], abs(current - previous))
+        assert np.isclose(records[index]["transaction_cost"]["classical"], 0.001 * abs(current - previous))
 
 
 def test_backtest_has_frozen_style_test_metrics_and_costs():
