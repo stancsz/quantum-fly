@@ -20,6 +20,7 @@ Reviewed: 2026-09-12
 |---|---|---|---|
 | Discovery | Kept the memorable `quantum-fly` name and added a precise GitHub description and relevant topics | Better qualified search and click intent | A topic or view is not adoption |
 | Landing | Added audience, proof snapshot, badges, and the research boundary above the fold | Faster comprehension and trust | Local evidence remains bounded |
+| Visual identity | Added a wide scientific social-preview asset with the project name and falsifiability hook | More recognizable repository and launch links | Visual polish is not evidence of adoption |
 | Activation | Added `python -m scripts.demo` with no external data | First visible result in seconds | Synthetic fixture only |
 | Reproduction | Added exact data preparation, tested loop arguments, cache behavior, and receipt preservation guidance | Fewer failed first runs | Requires network and disk on first setup |
 | Contribution | Added contribution, security, conduct, and research-result templates | Better-scoped issues and experiments | Maintainer response capacity is unproven |

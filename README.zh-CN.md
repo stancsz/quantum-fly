@@ -1,5 +1,7 @@
 # 量子果蝇 Quantum Fly
 
+![Quantum Fly：用连接组启发的结构提出假设，并与对照实验比较](assets/quantum-fly-social-preview.png)
+
 ### 果蝇的大脑连接图，能否帮助我们构建更稳健的投资组合实验？
 
 [![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![研究原型](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)

@@ -1,5 +1,7 @@
 # Quantum Fly
 
+![Quantum Fly: a connectome-inspired research hypothesis tested against controls](assets/quantum-fly-social-preview.png)
+
 ### Can a fruit fly brain map help us build more robust portfolio experiments?
 
 [![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![Research prototype](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)
