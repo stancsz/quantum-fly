@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use Quantum Fly in research, cite the repository and the upstream MaleCNS data source."
+title: "Quantum Fly"
+type: software
+authors:
+  - family-names: "stancsz"
+repository-code: "https://github.com/stancsz/quantum-fly"
+license: MIT
+version: 0.1.0
+date-released: 2026-09-12
+keywords:
+  - connectomics
+  - reproducible research
+  - quantitative finance
+  - quantum simulation

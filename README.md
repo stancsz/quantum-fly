@@ -2,7 +2,11 @@
 
 ### Can a fruit fly brain map help us build more robust portfolio experiments?
 
-[简体中文](README.zh-CN.md) · [Research hypotheses](docs/HYPOTHESES.md) · [Experiment plan](docs/EXPERIMENT_PLAN.md) · [Current goal](GOAL.md)
+[![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![Research prototype](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)
+
+[简体中文](README.zh-CN.md) · [Verified evidence](docs/VERIFICATION_2026-09-12.md) · [Research hypotheses](docs/HYPOTHESES.md) · [Experiment plan](docs/EXPERIMENT_PLAN.md)
+
+For researchers and quantitative engineers testing whether unusual network structure survives fair, causal controls.
 
 Quantum Fly is a research prototype designed for open, reproducible experimentation. It combines three unusual ingredients:
 
@@ -17,6 +21,23 @@ If that question interests you, fork the project, replace one component, run the
 > [!IMPORTANT]
 > This is an experimental research prototype, not investment advice. It does not claim quantum advantage, biological fidelity, profitability, whole-brain execution, or production readiness.
 
+## Verified bounded run
+
+The current evidence snapshot records **46 local tests**, **4,096 selected MaleCNS segments**, and **160,053 retained sparse edges**. A preregistered historical comparison passed its bounded research gate, but that result is not forward performance or investment evidence. See the [criterion-level verification record](docs/VERIFICATION_2026-09-12.md) for commands, denominators, limitations, and separate GO/NO-GO decisions.
+
+## See it in 30 seconds
+
+This synthetic demo needs no external research data:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e .
+python -m scripts.demo
+```
+
+It prints the same four-value input through a tiny sparse recurrent fixture and a no-graph control. The output is a code-path demonstration, not MaleCNS or market evidence.
+
 ## Why this project is worth exploring
 
 Most portfolio models begin with a familiar architecture and optimize performance. Quantum Fly begins with robustness and falsifiability.
@@ -27,7 +48,7 @@ The phrase **quantum stability** is a project hypothesis, not an established sci
 
 ## What works today
 
-The repository contains a reproducible, offline Python research skeleton with:
+The repository contains a reproducible Python research skeleton that runs offline after its inputs are prepared, with:
 
 - bounded MaleCNS connectome scans and subgraph experiments
 - finite market-feature encoding and sparse recurrent graph state
@@ -40,20 +61,21 @@ The repository contains a reproducible, offline Python research skeleton with:
 
 The default fixtures are synthetic. The current real-data path uses a bounded subset of the official MaleCNS release plus cached FRED 2024 S&P 500 index inputs. A successful run is evidence for that bounded experiment only.
 
-## Quick start
+## Reproduce the official-data path
 
-Requirements: Python 3.10 or newer, plus the official MaleCNS files described in [the data receipt](docs/DATA_RECEIPT.md).
+Requirements: Python 3.10 or newer and roughly 1.1 GB for the three bounded MaleCNS input tables. The first preparation step downloads official data; the first research run also downloads its declared FRED market input. Later validated runs can operate from those caches.
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -e ".[test,quantum]"
+python -m scripts.prepare_malecns --download
 python -m scripts.quickstart --check
 python -m scripts.quickstart
-python -m pytest
+python -m pytest -q
 ```
 
-The run writes a machine-readable receipt to `outputs/local-research-run.json`. If PennyLane is not installed, the receipt marks quantum outputs unavailable and still records the classical and connectome results.
+Read [data preparation](docs/DATA_PREPARATION.md) before downloading. The run writes a machine-readable receipt to `outputs/local-research-run.json`. Generated receipts are intentionally ignored by Git, so copy the exact receipt somewhere durable when sharing a result. If PennyLane is not installed, the receipt marks quantum outputs unavailable and still records the classical and connectome results.
 
 Other useful entry points:
 
@@ -64,8 +86,10 @@ python -m scripts.fly_chat "What is the current assessment, and what evidence is
 # Compare single Fly, three-member mean, coordinator state, and no-graph controls
 python -m scripts.run_structure_comparison --max-nodes 4096 --max-source-edges 10000000 --seeds 0 1 2
 
-# Run the bounded multi-Fly message and state loop
-python -m scripts.run_fly_loop
+# Run the bounded multi-Fly message and state loop with explicit inputs
+python -m scripts.run_fly_loop `
+  --features 0.1 -0.2 0.3 -0.05 `
+  --as-of 2024-01-02T00:00:00Z
 ```
 
 ## How it fits together
@@ -98,7 +122,7 @@ A useful fork changes one thing and preserves the controls. Good starting experi
 4. Add another causal market feature without changing the evaluation window.
 5. Reproduce a negative result on different hardware or a different seed set.
 
-When you publish a result, include the command, configuration, random seeds, data provenance, runtime, resource use, and failed runs. Open an issue with your receipt or propose a small pull request. The best contribution may be the experiment that proves an exciting idea does not work.
+Start with a degree-matched random graph or no-graph control. Include the command, configuration, random seeds, data provenance, runtime, resource use, and failed runs, then open a research-result issue or propose a small pull request. The best contribution may be the experiment that proves an exciting idea does not work. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The project software is available under the [MIT License](LICENSE). Before redistributing research results or data, also review [the open collaboration boundary](docs/OPEN_COLLABORATION.md); the MaleCNS data retains its separate CC BY attribution requirements.
 
@@ -120,6 +144,7 @@ The project software is available under the [MIT License](LICENSE). Before redis
 - [Data receipt](docs/DATA_RECEIPT.md): MaleCNS source, schema, checksums, and scale
 - [Research boundary](docs/RESEARCH_BOUNDARY.md): what the evidence does and does not establish
 - [Open collaboration](docs/OPEN_COLLABORATION.md): public research and private-work boundaries
+- [Marketing and launch review](docs/MARKETING_REVIEW.md): audience, proof funnel, launch experiments, and measurement rules
 
 ## Data and attribution
 

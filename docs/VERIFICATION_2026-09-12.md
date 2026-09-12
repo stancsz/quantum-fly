@@ -24,7 +24,7 @@ The Steward authorized an MIT software license and an evidence-baseline commit o
 
 ## Observed commands and receipts
 
-- `.venv\\Scripts\\python.exe -m pytest -q`: 45 passed in 3.79 seconds after all implementation files settled.
+- `.venv\\Scripts\\python.exe -m pytest -q`: the North Star baseline passed 45 tests; the public-launch synthetic demo adds one focused test, bringing the current suite to 46.
 - Disposable CPython 3.14 environment: editable install succeeded with NumPy 2.5.3, PyArrow 25.0.1, PennyLane 0.45.1, and pytest 9.1.1; its full suite passed 43 tests at that snapshot.
 - Explicit empty data directory: module and installed `quantum-fly` entry point both returned exit 2 with a precise missing-directory error.
 - Clean-interpreter bounded run: exit 0, 4,096 selected segments, 160,053 retained edges, isolated FRED SHA256 `a06c3c2b315402729b47579da2726b363a3fee2f25611eaa89321ead952bb5e9`, 63.226 seconds.
