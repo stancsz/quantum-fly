@@ -2,9 +2,9 @@
 
 ## Assessment
 
-The active `GOAL.md` contract has 11 acceptance criteria. Ten have current code, focused tests, and observed local evidence. Completion before the authorized baseline commit is therefore **10/11 (90.9%)**, above the requested threshold.
+The active `GOAL.md` contract has 11 acceptance criteria. All eleven have current code, focused tests, and observed local evidence. Completion is therefore **11/11 (100%)**, above the requested threshold.
 
-The Steward authorized an MIT software license and an evidence-baseline commit on 2026-09-12. Criterion 10 is complete. Criterion 5 remains open until the authorized commit is created and the pointer is verified against it.
+The Steward authorized an MIT software license and an evidence-baseline commit on 2026-09-12. The implementation and verifier sources are recorded in commit `ecef5619c0e6e16913d4f4e36f08a9fdf8cfb3e3`; `.mochu/VERIFIER_BASELINE` resolves to that exact commit.
 
 ## Criterion mapping
 
@@ -14,7 +14,7 @@ The Steward authorized an MIT software license and an evidence-baseline commit o
 | 2 | PASS | FRED content plus sidecar bind exact URL/range, SHA256, first download and validation times; five offline provenance/header tests pass. |
 | 3 | PASS | `configs/malecns-v1.0-manifest.json`, validation/import command, and exact local validation of all three official files. |
 | 4 | PASS | A disposable Python environment installed the editable project and exact dependency snapshot, ran 44 tests, and completed the bounded research path using isolated cache/receipt files. |
-| 5 | OPEN | Existing commit `a11528710e485e4e483cc3a4e1efac7e1930a48f` is real, and verifiers now use temporary receipts. The verifier sources changed after that commit, so accepting them as the new baseline requires an authorized commit. The current ship gate is honestly red rather than silently resetting its baseline. |
+| 5 | PASS | Commit `ecef5619c0e6e16913d4f4e36f08a9fdf8cfb3e3` contains the current source, tests, docs, and isolated verifiers. `.mochu/VERIFIER_BASELINE` resolves to it; focused verification preserves canonical receipt hashes and cleans temporary paths and normal locks. |
 | 6 | PASS | `requirements-lock.txt`, Python/platform policy, CI workflow, editable install, compile/import, PennyLane 0.45.1 import, full suite, and explicit missing-data exit 2 were observed. |
 | 7 | PASS | Registered candidate/no-graph replay covers four chronological folds, three seeds, 0.5x/1x/2x costs, paired deltas and deterministic 95% block-bootstrap interval. Receipt verifier returned valid `GO` for the bounded research gate only. |
 | 8 | PASS | Runtime enforces finite timeout, queue, payload/state bounds and thread-safe append/dedupe; concurrent tests pass. Cooperative timeout limitations remain visible. |
@@ -36,7 +36,7 @@ The Steward authorized an MIT software license and an evidence-baseline commit o
 ## Capability-layer decisions
 
 - Local research: **GO**, bounded to the declared data, controls, resources, and historical protocol.
-- Public reproducibility: **NO-GO**, pending completion of the authorized Git/verifier baseline commit. The MIT license decision is complete.
+- Public reproducibility: **GO** for sharing the identified Git snapshot under MIT with separately attributed MaleCNS inputs and the documented reconstruction process. No push or public publication was performed.
 - Unattended runtime: **NO-GO**, because tested local concurrency and cooperative timeouts do not prove long-running external executor termination or recovery.
 - Investment claims: **NO-GO**. Historical research lift is not forward performance, suitability, profitability, or advice.
 - Production use: **NO-GO**. No operational SLO, deployment, monitoring, rollback, security review, or live-service evidence exists.

@@ -1,6 +1,6 @@
 # ACTIVE GOAL: 修复研究证据完整性与本地可复现性
 
-Status: active
+Status: done
 Owner: Steward contract plus Builder execution record in this file
 Opened: 2026-09-11
 
@@ -36,7 +36,7 @@ Opened: 2026-09-11
 - [x] FRED cache 与实际请求 URL、日期范围、内容 SHA256、首次下载时间和验证时间绑定。已有 cache 与请求不匹配时必须明确失败或重新获取，不得把读取时间写成下载时间。新增完全离线的 stale-cache、URL mismatch、损坏内容和缺失列测试。
 - [x] MaleCNS 数据准备有可重跑的获取或导入流程及机器可读 manifest。quickstart 在运行前验证精确文件名、大小、SHA256 和必需 schema；缺失、重复匹配、错误版本或损坏文件产生明确错误。不得把“文件存在”当作数据完整性证明。
 - [x] 独立使用者可在干净环境按文档完成安装、获取或验证数据、运行最小 bounded 实验并生成 receipt。验证记录解释哪些输入可公开重建、哪些本地文件因大小或许可不进入 Git，以及如何核对生成结果，不能依赖未说明的本机历史状态。
-- [ ] 建立真实 Git 基线，使源代码、测试、文档和 verifier 可追踪；`.mochu/VERIFIER_BASELINE` 指向存在的 commit。ship gate 不在未明确请求时覆盖 canonical research receipts，验证器生成临时输出时使用隔离目录并清理锁。提交、推送和公开发布仍需用户明确授权。
+- [x] 建立真实 Git 基线，使源代码、测试、文档和 verifier 可追踪；`.mochu/VERIFIER_BASELINE` 指向存在的 commit。ship gate 不在未明确请求时覆盖 canonical research receipts，验证器生成临时输出时使用隔离目录并清理锁。提交、推送和公开发布仍需用户明确授权。
 - [x] 可复现环境明确 Python 版本、核心依赖和 quantum extra 的解析版本。CI 或等价 clean-environment 验证覆盖安装、20 项以上现有测试、quantum extra 路径、compile/import 和 quickstart 的无数据失败路径。`pip check` 只能作为辅助证据。
 - [x] 结构与模型比较加入至少一个强且透明的经典基线，并预先定义选择规则。报告多时期或多资产结果、seed 分布、置信区间或其他明确不确定性估计；连接组最低 ID 子集不得被描述为代表性样本。负结果必须保留。
 - [x] runtime 对 `max_seconds`、queue size、payload/state 大小和非有限数值执行显式边界验证。JSONL append、dedupe、queue 和 task state 在并发访问下有一致性测试；非协作 executor 超时后仍可能继续运行的限制必须在 API 与文档中保持可见。
@@ -80,7 +80,7 @@ Opened: 2026-09-11
 - [x] 修复 cache provenance 和离线数据完整性测试。
 - [x] 增加 MaleCNS manifest、校验和可重跑数据准备流程。
 - [x] 建立 clean install、clean input 和 receipt reproduction 验证。
-- [ ] 建立可用 Git/verifier baseline，并让 ship gate 保持验证隔离。
+- [x] 建立可用 Git/verifier baseline，并让 ship gate 保持验证隔离。
 - [x] 固定环境并覆盖 optional quantum 路径。
 - [x] 增加更强基线、不确定性报告和更广时间/资产证据。
 - [x] 加固 runtime 并发、预算与持久化输入边界。
@@ -108,7 +108,11 @@ Opened: 2026-09-11
 
 ### Remaining gap
 
-2026-09-12 fresh mapping records 9/11 criteria complete (81.8%). The two open criteria are the accepted Git/verifier baseline and software-license metadata. Both require the explicit Steward decisions named in the contract; see `docs/VERIFICATION_2026-09-12.md`. The requested 10/11 threshold cannot be claimed until at least one is authorized and freshly verified.
+2026-09-12 fresh mapping records 11/11 criteria complete. The authorized implementation baseline is commit `ecef5619c0e6e16913d4f4e36f08a9fdf8cfb3e3`; `.mochu/VERIFIER_BASELINE` points to that commit, and the MIT license decision is recorded. See `docs/VERIFICATION_2026-09-12.md`. Publication, deployment, investment validity, and production readiness remain outside this completion claim.
+
+### Completion summary
+
+The repository now has turnover-correct backtests, bound cache and data provenance, exact MaleCNS validation, a clean-install and optional-quantum path, preregistered classical controls with uncertainty, bounded concurrent runtime behavior, strict numeric and persistence validation, MIT reuse terms, an accepted Git/verifier baseline, and a criterion-level verification record. This completes the local research and reproducibility goal only within its declared boundaries.
 
 ---
 
