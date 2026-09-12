@@ -63,7 +63,7 @@ python -m scripts.demo
 
 ## 复现官方数据路径
 
-需要 Python 3.10 或更高版本，并为三张有界 MaleCNS 输入表准备约 1.1 GB 空间。首次准备会下载官方数据，首次研究运行还会下载声明的 FRED 市场输入；后续通过验证的运行可以使用缓存。
+需要 Python 3.10 或更高版本，并为三张有界 MaleCNS 输入表准备约 1.1 GB 空间。可选 PennyLane 路径需要 Python 3.11 或更高版本。首次准备会下载官方数据，首次研究运行还会下载声明的 FRED 市场输入；后续通过验证的运行可以使用缓存。
 
 ```powershell
 python -m venv .venv

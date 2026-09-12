@@ -63,7 +63,7 @@ The default fixtures are synthetic. The current real-data path uses a bounded su
 
 ## Reproduce the official-data path
 
-Requirements: Python 3.10 or newer and roughly 1.1 GB for the three bounded MaleCNS input tables. The first preparation step downloads official data; the first research run also downloads its declared FRED market input. Later validated runs can operate from those caches.
+Requirements: Python 3.10 or newer and roughly 1.1 GB for the three bounded MaleCNS input tables. The optional PennyLane path requires Python 3.11 or newer. The first preparation step downloads official data; the first research run also downloads its declared FRED market input. Later validated runs can operate from those caches.
 
 ```powershell
 python -m venv .venv

@@ -2,7 +2,7 @@
 
 Quantum Fly supports CPython 3.10 through 3.13 on Windows, Linux, and macOS. The primary local evidence is produced on Windows with PowerShell. The cross-platform clean-environment workflow runs on Linux and must remain green before a release claim.
 
-`pyproject.toml` declares compatible dependency ranges for users. `requirements-lock.txt` records the exact environment used by the clean verification workflow, including the optional PennyLane path. This is a verification snapshot, not a promise that every compatible combination has been tested.
+`pyproject.toml` declares compatible dependency ranges for users. `requirements-lock.txt` records exact environment selections used by the clean verification workflow. NumPy is pinned separately across its Python support boundary, and the optional PennyLane path is installed only on Python 3.11 or newer because PennyLane 0.45.1 does not support Python 3.10. This is a verification snapshot, not a promise that every compatible combination has been tested.
 
 Dependency updates should be narrow and deliberate:
 
