@@ -1,10 +1,12 @@
-# 🪰 We Gave a Fruit Fly Brain Four Qubits and Sent It to Wall Street.
+# 🪰 Fruit Fly Brain × 4 Qubits × Wall Street
 
-## Then we built it a mecha and made it fight the most boring baseline.
+## MECHA FLY vs. THE BORING BASELINE
 
 ![A six-legged mecha fruit fly with a neural processor chip raises an energy shield against a quantum market experiment](assets/quantum-fly-mecha-chip-hero-v6.png)
 
 **A real fruit-fly connectome. An optional 4-qubit scoring path. One brutally ordinary portfolio control.**
+
+**THE FIGHT:** connectome signal vs. no-graph control. **THE VERDICT:** bounded historical gate passed; forward edge still unproven.
 
 ```text
 FRUIT-FLY CONNECTOME → 4-QUBIT SCORE → PORTFOLIO SIGNAL
