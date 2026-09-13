@@ -2,7 +2,7 @@
 
 ## Then we built it a mecha and made it fight the most boring baseline.
 
-![A fully articulated connectome-powered mecha fruit fly raises an energy shield against a quantum market experiment](assets/quantum-fly-mecha-shield-hero-v5.png)
+![A six-legged mecha fruit fly with a neural processor chip raises an energy shield against a quantum market experiment](assets/quantum-fly-mecha-chip-hero-v6.png)
 
 **A real fruit-fly connectome. An optional 4-qubit scoring path. One brutally ordinary portfolio control.**
 
