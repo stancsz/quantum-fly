@@ -2,7 +2,7 @@
 
 ## 我们给它造了机甲和护盾，然后让它和最无聊的基线开战。
 
-![连接组驱动的机甲果蝇展开能量护盾迎战量子市场实验](assets/quantum-fly-mecha-shield-hero-v4.png)
+![完整机械肢体的连接组机甲果蝇展开能量护盾迎战量子市场实验](assets/quantum-fly-mecha-shield-hero-v5.png)
 
 **真实果蝇脑图。可选 4 量子比特评分。一个毫不花哨的投资组合对照。**
 
