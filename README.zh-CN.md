@@ -1,27 +1,27 @@
-# 量子果蝇 Quantum Fly
+# 🪰 果蝇大脑，量子炒股。
 
-![Quantum Fly：用连接组启发的结构提出假设，并与对照实验比较](assets/quantum-fly-social-preview.png)
+## 我们给它造了机甲和护盾，然后让它和最无聊的基线开战。
 
-### 果蝇的大脑连接图，能否帮助我们构建更稳健的投资组合实验？
+![连接组驱动的机甲果蝇展开能量护盾迎战量子市场实验](assets/quantum-fly-mecha-shield-hero-v4.png)
 
-[![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![研究原型](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)
+**真实果蝇脑图。可选 4 量子比特评分。一个毫不花哨的投资组合对照。**
 
-[English](README.md) · [验证证据](docs/VERIFICATION_2026-09-12.md) · [研究假设](docs/HYPOTHESES.md) · [实验计划](docs/EXPERIMENT_PLAN.md)
+```text
+果蝇连接组 → 4 量子比特评分 → 投资组合信号
+                              ⚔
+                           无图基线
+```
 
-面向希望用公平、因果对照检验非常规网络结构的研究人员和量化工程师。
+> **脑子很怪，控制很严，收益不魔法。**
 
-量子果蝇是一个面向开放、可复现实验的研究原型，把三种不寻常的元素放在同一个可检验框架中：
+[运行实验](#30-秒看到结果) · [查看证据](docs/VERIFICATION_2026-09-12.md) · [English](README.md)
 
-- 以公开发布的雄性果蝇连接组作为结构启发
-- 使用明确经典基线的因果离线投资组合实验
-- 把小规模量子模拟作为可检验的评分与稳定性组件
-
-项目不是要制造一个神奇的交易机器人，而是要提出一个更严格的问题：**当市场、参数和样本发生变化时，哪些决策仍然成立？**
-
-如果你也对这个问题感兴趣，欢迎 fork 项目，替换其中一个组件，保留同样的对照实验，然后分享哪里失效了。负面结果同样有价值。
+这是一次可复现实验：果蝇大脑的网络结构，在因果时间切分、交易成本、扰动测试和简单基线的围攻下，还能不能留下任何有用信号？
 
 > [!IMPORTANT]
-> 这是实验性研究原型，不是投资建议。项目不声称存在量子优势、生物学复现、稳定盈利、全脑运行或生产就绪能力。
+> 仅限研究原型。不进行实盘交易，不构成投资建议，也不声称稳定盈利、生物学复现或量子优势。
+
+[![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![研究原型](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)
 
 ## 已验证的有界运行
 

@@ -1,27 +1,27 @@
-# Quantum Fly
+# 🪰 We Gave a Fruit Fly Brain Four Qubits and Sent It to Wall Street.
 
-![Quantum Fly: a connectome-inspired research hypothesis tested against controls](assets/quantum-fly-social-preview.png)
+## Then we built it a mecha and made it fight the most boring baseline.
 
-### Can a fruit fly brain map help us build more robust portfolio experiments?
+![A connectome-powered mecha fruit fly raises an energy shield against a quantum market experiment](assets/quantum-fly-mecha-shield-hero-v4.png)
 
-[![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![Research prototype](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)
+**A real fruit-fly connectome. An optional 4-qubit scoring path. One brutally ordinary portfolio control.**
 
-[简体中文](README.zh-CN.md) · [Verified evidence](docs/VERIFICATION_2026-09-12.md) · [Research hypotheses](docs/HYPOTHESES.md) · [Experiment plan](docs/EXPERIMENT_PLAN.md)
+```text
+FRUIT-FLY CONNECTOME → 4-QUBIT SCORE → PORTFOLIO SIGNAL
+                                            ⚔
+                                    NO-GRAPH CONTROL
+```
 
-For researchers and quantitative engineers testing whether unusual network structure survives fair, causal controls.
+> **Weird brain. Boring controls. No magical returns.**
 
-Quantum Fly is a research prototype designed for open, reproducible experimentation. It combines three unusual ingredients:
+[Run the experiment](#see-it-in-30-seconds) · [See the evidence](docs/VERIFICATION_2026-09-12.md) · [简体中文](README.zh-CN.md)
 
-- the published male fruit fly connectome as structural inspiration
-- causal, offline portfolio experiments with explicit classical baselines
-- small quantum simulations used as testable scoring and stability components
-
-The aim is not to make a magical trading bot. It is to ask a sharper question: **when markets, parameters, and samples change, which decisions survive the perturbation?**
-
-If that question interests you, fork the project, replace one component, run the same controls, and share what breaks. Negative results are welcome.
+This is a reproducible attempt to find out whether biological network structure leaves any useful signal after causal splits, transaction costs, perturbations, and simpler controls have tried to kill it.
 
 > [!IMPORTANT]
-> This is an experimental research prototype, not investment advice. It does not claim quantum advantage, biological fidelity, profitability, whole-brain execution, or production readiness.
+> Research prototype only. No live trading, investment advice, profitability claim, biological-fidelity claim, or quantum-advantage claim.
+
+[![MIT License](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)](pyproject.toml) [![Research prototype](https://img.shields.io/badge/status-research%20prototype-6f42c1)](docs/RESEARCH_BOUNDARY.md)
 
 ## Verified bounded run
 
